@@ -2,44 +2,38 @@
 
 using namespace std;
 
-struct ListNode {
-    char data;
-    ListNode* next; // pointer to the next node in the list
+template<typename T>
+struct Node {
+    T data;
+    Node<T>* next; // pointer to the next node in the list
 
-    ListNode(char value): data(value), next(nullptr) {}
+    Node(T value): data(value), next(nullptr) {}
 };
 
-// linked list
+template<typename T>
 class LinkedList {
 private:
-    ListNode* head;
+    Node<T>* head;
 
 public:
-    LinkedList(char initialValue): head(new ListNode(initialValue)) {}
+    LinkedList(T initialValue): head(new Node<T>(initialValue)) {}
     LinkedList(): head(nullptr) {}
 
     ~LinkedList() {
         while (head != nullptr) {
-            ListNode* temp = head;
+            Node<T>* temp = head;
             head = head->next;
             delete temp;
         }
     }
 
-    // allocate new list node with initial value `value` and append to front
-    void push_front(int value) {
-        ListNode* n = new ListNode(value);
-        n->next = head;
-        head = n;
-    }
-
     // add element at the end
-    void push_back(int value) {
-        ListNode* n = new ListNode(value);
+    void push_back(T value) {
+        Node<T>* n = new Node<T>(value);
         if (head == nullptr) {
             head = n;
         } else { // list is not empty, traverse to the end and attach node to current last
-           ListNode* temp = head; 
+           Node<T>* temp = head; 
            while (temp->next != nullptr) {
                 temp = temp->next;  
            }
@@ -58,7 +52,7 @@ public:
             head = nullptr;
         } else {
             // traverse to the second-to-last node
-            ListNode* n = head;
+            Node<T>* n = head;
             while (n->next->next != nullptr) {
                 n = n->next;
             }
@@ -68,13 +62,14 @@ public:
         }
     }
 
-    char peek() {
+    // return the value of the last element in the linked list without removing it
+    T back() {
         if (head == nullptr) {
             // list is empty, return default value
-            return '\0';
+            return T();
         } else {
             // traverse to the last node and return it's value
-            ListNode* n = head;
+            Node<T>* n = head;
             while (n->next != nullptr) {
                 n = n->next;
             }
@@ -84,7 +79,7 @@ public:
 
     int size() const {
         int count = 0;
-        ListNode* n = head;
+        Node<T>* n = head;
         while (n != nullptr) {
             count++;
             n = n->next;
@@ -93,25 +88,22 @@ public:
     }
 };
 
+template<typename T>
 class Stack {
 private:
-    LinkedList list;
+    LinkedList<T> list;
 
 public:
-    void push(char value) {
-        if (isdigit(value)) {
-            list.push_back(value - '0'); // Convert digit character to integer value
-        } else {
-            list.push_back(value);
-        }
+    void push(T value) {
+        list.push_back(value);
     }
 
     void pop() {
         list.pop_back();
     }
 
-    char peek() {
-        return list.peek();
+    T top() {
+        return list.back();
     }
 
     bool isEmpty() const {
@@ -123,6 +115,7 @@ class Expression {
 private: 
     string infix;
     string postfix;
+    // 1 -> infix. 2 -> postfix
     int inputDirection;
 
 public:
@@ -136,7 +129,7 @@ public:
     }
 
     string inToPost() {
-        Stack stack;
+        Stack<char> stack;
         string result;
 
         for (char ch : infix) {
@@ -149,17 +142,22 @@ public:
             } else if (ch == ')') {
                 // if the character is a closing parenthesis, pop and append operators from the stack
                 // until an opening parenthesis is encountered
-                while (!stack.isEmpty() && stack.peek() != '(') {
-                    result += stack.peek();
+                while (!stack.isEmpty() && stack.top() != '(') {
+                    result += stack.top();
                     stack.pop();
                 }
                 // pop the opening parenthesis from the stack
-                stack.pop();
+                stack.pop(); // pop '('
             } else {
                 // if the character is an operator, pop and append operators from the stack
                 // until the stack is empty or the top operator has lower precedence
-                while (!stack.isEmpty() && stack.peek() != '(' && getPrecedence(ch) <= getPrecedence(stack.peek())) {
-                    result += stack.peek();
+                while (
+                    !stack.isEmpty() && getPrecedence(ch) < getPrecedence(stack.top()) ||
+                    !stack.isEmpty() && getPrecedence(ch) == getPrecedence(stack.top()) &&
+                    associativity(ch) == 'L'
+                ) 
+                {
+                    result += stack.top();
                     stack.pop();
                 }
                 stack.push(ch);
@@ -168,7 +166,7 @@ public:
 
         // pop and append any remaining operators from the stack to the result
         while (!stack.isEmpty()) {
-            result += stack.peek();
+            result += stack.top();
             stack.pop();
         }
 
@@ -177,24 +175,78 @@ public:
         return result;
     }
 
-    // helper metho to get the precedence of an operator
-    int getPrecedence(char op) {
-        if (op == '+' || op == '-') {
-            return 1;
-        } else if (op == '*' || op == '/') {
-            return 2;
-        }
-        return 0; //default precedence for other characters;
-    }
-
     string postToIn() {
-        // TODO: implement this
-        return "";
+        Stack<string> stack;
+        string result;
+
+        for (char ch : postfix) {
+            if (isalnum(ch)) {
+                // if the character is an operand, push it onto the stack
+                stack.push(string(1, ch));
+            } else {
+                // if the character is an operator, pop two operands from the stack,
+                // create a sub-expression, and push it back onto the stack
+                string operand2 = stack.top();
+                stack.pop();
+                string operand1 = stack.top();
+                stack.pop();
+                // build the sub-expression and push it back onto the stack
+                string subExpression = "(" + operand1 + ch + operand2 + ")";
+                stack.push(subExpression);
+            }
+        }
+
+        // the final result is at the top of the stack
+        result = stack.top();
+
+        infix = result;
+
+        return result;
     }
 
     double evaluate() {
-        // TODO: implement this
-        return 0.0;
+        Stack<double> stack;
+
+        for (char ch : postfix) {
+            if (isdigit(ch)) {
+                // if the character is a digit, push its numeric value onto the operand stack
+                stack.push(ch - '0');
+            } else if (isOperator(ch)) {
+                // If the character is an operator, pop two operands from the stack,
+                // perform the operation, and push the result back onto the stack
+                double operand2 = stack.top();
+                stack.pop();
+
+                double operand1 = stack.top();
+                stack.pop();
+
+                double result = performOperation(operand1, operand2, ch);
+                stack.push(result);
+            }
+        }
+
+        return stack.top();
+    }
+
+    // helper metho to get the precedence of an operator
+    int getPrecedence(char op) {
+        if (op == '^') {
+            return 3;
+        } else if (op == '*' || op == '/') {
+            return 2;
+        } else if (op == '+' || op == '-') {
+            return 1;
+        } else {
+            return -1;
+        }
+    }
+
+    // function to return associativity of operators
+    char associativity(char c) {
+        if (c == '^') {
+            return 'R';
+        }
+        return 'L'; // Default to left-associative
     }
 
     string getInfix() {
@@ -207,6 +259,33 @@ public:
 
     int getInputDirection() {
         return inputDirection;
+    }
+
+    // helper method to check if a character is an operator
+    bool isOperator(char ch) {
+        return ch == '+' || ch == '-' || ch == '*' || ch == '/';
+    }
+
+    // helper method to perform the arithmetic operation
+    double performOperation(double operand1, double operand2, char op) {
+        switch (op) {
+            case '+':
+                return operand1 + operand2;
+            case '-':
+                return operand1 - operand2;
+            case '*':
+                return operand1 * operand2;
+            case '/':
+                if (operand2 != 0) {
+                    return operand1 / operand2;
+                } else {
+                    cerr << "Error: Division by zero." << endl;
+                    exit(1);
+                }
+            default:
+                cerr << "Error: Invalid operator." << endl;
+                exit(1);
+        }
     }
 
     void displayMenu() {
@@ -245,7 +324,8 @@ public:
                 }
                 break;
             case 2:
-                // TODO: Handle expression evaluation
+                evaluate();
+                cout << "Result: " << evaluate() << endl;
                 break;
             case 3:
                 cout << "Exiting program.\n";
