@@ -111,6 +111,40 @@ public:
     }
 };
 
+// helper method to check if a character is an operator
+bool isOperator(char ch) {
+    return ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '^';
+}
+
+bool isValidCharacter(char ch, int inputDirection) {
+    if (inputDirection == 1) { // infix
+        return isalnum(ch) || ch == '(' || ch == ')' || isOperator(ch);
+    } else if (inputDirection == 2) { // postfix
+        return isalnum(ch) || isOperator(ch);
+    }
+    return false;
+}
+
+bool isValidExpressionCharacters(const string& expression, int inputDirection) {
+    for (char ch : expression) {
+        if (!isValidCharacter(ch, inputDirection)) {
+            cout << "Error: Invalid character '" << ch << "' in the expression." << endl;
+            return false;
+        }
+    }
+    return true;
+}
+
+bool isValidNumericExpression(const string& expression) {
+    // Check if the input expression contains only numeric characters
+    for (char ch : expression) {
+        if (isdigit(ch)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 class Expression {
 private: 
     string infix;
@@ -126,6 +160,18 @@ public:
         } else if (direction == 2) {
             postfix = input;
         }
+    }
+
+    string getInfix() {
+        return infix;
+    }
+
+    string getPostfix() {
+        return postfix;
+    }
+
+    int getInputDirection() {
+        return inputDirection;
     }
 
     string inToPost() {
@@ -208,14 +254,24 @@ public:
         Stack<double> stack;
 
         for (char ch : postfix) {
-            if (isdigit(ch)) {
+            if (isalnum(ch)) {
                 // if the character is a digit, push its numeric value onto the operand stack
                 stack.push(ch - '0');
             } else if (isOperator(ch)) {
                 // If the character is an operator, pop two operands from the stack,
                 // perform the operation, and push the result back onto the stack
+                if (stack.isEmpty()) {
+                    cerr << "Error: Insufficient operands for operator '" << ch << "'." << endl;
+                    exit(1);
+                }
+
                 double operand2 = stack.top();
                 stack.pop();
+
+                if (stack.isEmpty()) {
+                    cerr << "Error: Insufficient operands for operator '" << ch << "'." << endl;
+                    exit(1);
+                }
 
                 double operand1 = stack.top();
                 stack.pop();
@@ -225,10 +281,16 @@ public:
             }
         }
 
+        // At the end, the result should be at the top of the stack
+        if (stack.isEmpty()) {
+            cerr << "Error: Invalid expression." << endl;
+            exit(1);
+        }
+
         return stack.top();
     }
 
-    // helper metho to get the precedence of an operator
+    // helper method to get the precedence of an operator
     int getPrecedence(char op) {
         if (op == '^') {
             return 3;
@@ -246,24 +308,7 @@ public:
         if (c == '^') {
             return 'R';
         }
-        return 'L'; // Default to left-associative
-    }
-
-    string getInfix() {
-        return infix;
-    }
-
-    string getPostfix() {
-        return postfix;
-    }
-
-    int getInputDirection() {
-        return inputDirection;
-    }
-
-    // helper method to check if a character is an operator
-    bool isOperator(char ch) {
-        return ch == '+' || ch == '-' || ch == '*' || ch == '/';
+        return 'L'; // default to left-associative
     }
 
     // helper method to perform the arithmetic operation
@@ -290,7 +335,7 @@ public:
 
     void displayMenu() {
         cout << "Expression Conversion Menu:\n";
-    
+
         if (getInputDirection() == 1) {
             // If the input is infix, show options for converting to postfix
             cout << "1. Convert Infix to Postfix\n";
@@ -299,7 +344,6 @@ public:
             cout << "1. Convert Postfix to Infix\n";
         }
 
-        // Common options for both infix and postfix
         cout << "2. Evaluate Expression\n";
         cout << "3. Quit\n";
     }
@@ -315,12 +359,8 @@ public:
             case 1:
                 if (getInputDirection() == 1) {
                     inToPost();
-                    cout << "Postfix expression: " << getPostfix() << endl;
                 } else if (getInputDirection() == 2) {
                     postToIn();
-                    cout << "Infix expression: " << getInfix() << endl;
-                } else {
-                    cout << "Invalid input direction.\n";
                 }
                 break;
             case 2:
@@ -331,7 +371,7 @@ public:
                 cout << "Exiting program.\n";
                 break;
             default:
-                cout << "Invalid choice. Please enter a number between 1 and 4.\n";            
+                cout << "Invalid choice. Please enter a number between 1 and 3.\n";            
                 break;
             }
         } while (choice != 3);
@@ -342,28 +382,52 @@ int getExpressionDirection() {
     int direction;
     cout << "Enter the direction (1 for infix, 2 for postfix): ";
     cin >> direction;
+
+    // check if the input is numeric and within valid range
+    while (cin.fail() || (direction != 1 && direction != 2)) {
+        cin.clear();  // clear the error flag
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');  // discard invalid input
+        cerr << "Error: Invalid input direction. Please enter 1 for infix or 2 for postfix." << endl;
+        cout << "Enter the direction (1 for infix, 2 for postfix): ";
+        cin >> direction;
+    }
+
     return direction;
 }
 
-string getInputExpression(int direction) {
+string getInputExpression(int inputDirection) {
     string input;
-    if (direction == 1) {
-        cout << "Enter an infix expression: ";
-    } else if (direction == 2) {
-        cout << "Enter a postfix expression: ";
-    } else {
-        // TODO: Handle the case when the direction is neither 1 nor 2
-        cout << "Enter an infix or postfix expression: ";
-    }
-    cin >> input;
+
+    do {
+        cout << "Enter ";
+        if (inputDirection == 1) {
+            cout << "an infix expression: ";
+        } else if (inputDirection == 2) {
+            cout << "a postfix expression: ";
+        }
+
+        if (!(cin >> input) || !isValidExpressionCharacters(input, inputDirection)) {
+            // Input is not valid (not a string or contains invalid characters)
+            cin.clear();  // Clear the error flag
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');  // Discard invalid input
+            cout << "Invalid input. Please enter a valid expression.\n";
+        } else {
+            // Input is valid, break out of the loop
+            break;
+        }
+    } while (true);
+
     return input;
 }
 
 int main() {
     cout << "Welcome to the Expression Converter and Evaluator!\n";
+
     int direction = getExpressionDirection();
     string input = getInputExpression(direction);
+
     Expression exp(input, direction);
     exp.processUserInput();
+
     return 0;        
 }
